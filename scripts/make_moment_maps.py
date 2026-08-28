@@ -19,7 +19,7 @@ LINE_CUBES = {
         347.3306 * u.GHz,
     ),
     "member.uid___A001_X3621_X2808.Clump_H6_sci.spw31.cube.I.pbcor.fits": (
-        "SO_6(5)-5(4)",
+        "SO_6_5-5_4",
         219.9494 * u.GHz,
     ),
     "member.uid___A001_X3621_X2808.Clump_H6_sci.spw33.cube.I.pbcor.fits": (

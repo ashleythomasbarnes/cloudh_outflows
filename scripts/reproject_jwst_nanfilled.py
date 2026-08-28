@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Put the nan-filled JWST NIRCam and MIRI images onto separate common grids.
+"""Put the nan-filled JWST images onto their three separate common grids.
 
-The first alphabetically sorted image from each instrument is the default
-template.  Outputs are written below ``DATA_DIR/reprojected`` and the source
-FITS files are never modified.
+MIRI, short-wave NIRCam, and long-wave NIRCam each use their own grid.  The
+first alphabetically sorted image in each group is the default template.
+Outputs are written below ``DATA_DIR/reprojected`` and source FITS files are
+never modified.
 """
 
 from argparse import ArgumentParser
@@ -18,6 +19,22 @@ DEFAULT_DATA_DIR = Path(
     "/Users/abarnes/Library/CloudStorage/Dropbox/Data/Galactic/JWST/"
     "cloud_h/jwst/fits/nanfilled"
 )
+
+GROUP_PATTERNS = {
+    "miri": ("_miri_",),
+    "nircam-short": (
+        "_nircam_clear-f115w_",
+        "_nircam_clear-f182m_",
+        "_nircam_clear-f200w_",
+        "_nircam_f150w2-f162m_",
+    ),
+    "nircam-long": (
+        "_nircam_clear-f356w_",
+        "_nircam_clear-f480m_",
+        "_nircam_f405n-f444w_",
+        "_nircam_f444w-f470n_",
+    ),
+}
 
 
 def science_hdu(hdul):
@@ -37,7 +54,7 @@ def reproject_group(instrument, files, template_file, outdir, overwrite):
         target_shape = template_hdu.data.shape
         template_primary = template_hdul[0].header.copy()
 
-    print(f"\n{instrument.upper()} template: {template_file.name}")
+    print(f"\n{instrument} template: {template_file.name}")
     for filename in files:
         output = outdir / f"{filename.stem}_reprojected.fits"
         if output.exists() and not overwrite:
@@ -70,26 +87,33 @@ def main():
     parser = ArgumentParser(description=__doc__)
     parser.add_argument("--data-dir", type=Path, default=DEFAULT_DATA_DIR)
     parser.add_argument("--outdir", type=Path, help="Default: DATA_DIR/reprojected")
-    parser.add_argument("--nircam-template", type=Path)
     parser.add_argument("--miri-template", type=Path)
+    parser.add_argument("--nircam-short-template", type=Path)
+    parser.add_argument("--nircam-long-template", type=Path)
     parser.add_argument("--overwrite", action="store_true")
     args = parser.parse_args()
 
     files = sorted(args.data_dir.glob("*.fits"))
     groups = {
-        "nircam": [file for file in files if "_nircam_" in file.name.lower()],
-        "miri": [file for file in files if "_miri_" in file.name.lower()],
+        name: [
+            file
+            for file in files
+            if any(pattern in file.name.lower() for pattern in patterns)
+        ]
+        for name, patterns in GROUP_PATTERNS.items()
     }
-    if not groups["nircam"] or not groups["miri"]:
-        parser.error("Need at least one NIRCam and one MIRI .fits file")
+    missing_groups = [name for name, group in groups.items() if not group]
+    if missing_groups:
+        parser.error("No .fits files found for: " + ", ".join(missing_groups))
 
     outdir = args.outdir or args.data_dir / "reprojected"
     outdir.mkdir(parents=True, exist_ok=True)
     templates = {
-        "nircam": args.nircam_template or groups["nircam"][0],
         "miri": args.miri_template or groups["miri"][0],
+        "nircam-short": args.nircam_short_template or groups["nircam-short"][0],
+        "nircam-long": args.nircam_long_template or groups["nircam-long"][0],
     }
-    for instrument in ("nircam", "miri"):
+    for instrument in ("miri", "nircam-short", "nircam-long"):
         if not templates[instrument].is_file():
             parser.error(f"Missing {instrument} template: {templates[instrument]}")
         reproject_group(
